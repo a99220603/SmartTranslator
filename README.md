@@ -5,6 +5,7 @@
 [![Minecraft](https://img.shields.io/badge/minecraft-1.21.4-green.svg)](https://minecraft.net/)
 [![NeoForge](https://img.shields.io/badge/neoforge-21.4.154-orange.svg)](https://neoforged.net/)
 
+
 智能翻譯 MOD - 為 Minecraft 提供高性能的實時翻譯功能，支援本地緩存的自動翻譯系統。
 
 ## ✨ 主要特色
@@ -148,9 +149,9 @@ SmartTranslator/
 
 ## 📞 聯絡方式
 
-- 作者：SmartTranslator Team
-- 問題回報：[GitHub Issues](https://github.com/yourusername/SmartTranslator/issues)
-
+- 作者：AI編寫老鼠
+- 問題回報：a99220603@gmail.com
+- 贊助:(https://www.paypal.com/ncp/payment/YWQBRX9FYM63U)
 ## 🙏 致謝
 
 感謝所有為本專案做出貢獻的開發者和使用者！
