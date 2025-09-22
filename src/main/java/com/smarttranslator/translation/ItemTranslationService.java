@@ -146,6 +146,20 @@ public class ItemTranslationService {
     }
     
     /**
+     * 獲取緩存的翻譯結果
+     */
+    public String getCachedTranslation(String originalText) {
+        return translationManager.getCachedTranslation(originalText);
+    }
+    
+    /**
+     * 檢查是否有緩存的翻譯
+     */
+    public boolean hasCachedTranslation(String originalText) {
+        return translationManager.hasCachedTranslation(originalText);
+    }
+    
+    /**
      * 檢查物品是否應該被翻譯
      */
     public boolean shouldTranslateItem(ItemStack itemStack) {
@@ -167,41 +181,5 @@ public class ItemTranslationService {
         }
         
         return true;
-    }
-    
-    /**
-     * 從緩存中獲取翻譯結果（不觸發新的翻譯請求）
-     */
-    public String getCachedTranslation(String originalText) {
-        if (originalText == null || originalText.trim().isEmpty()) {
-            return null;
-        }
-        
-        // 直接從 TranslationManager 的緩存中查詢
-        return translationManager.getCachedTranslation(originalText);
-    }
-    
-    /**
-     * 預加載常用物品的翻譯
-     */
-    public void preloadCommonTranslations() {
-        // 常見物品名稱列表
-        String[] commonItems = {
-            "Oak Log", "Stone", "Dirt", "Grass Block", "Cobblestone",
-            "Oak Planks", "Wooden Planks", "Iron Ingot", "Gold Ingot",
-            "Diamond", "Coal", "Redstone", "Lapis Lazuli", "Emerald"
-        };
-        
-        for (String item : commonItems) {
-            // 異步預加載翻譯
-            translateText(item, true)
-                .thenAccept(translation -> {
-                    LOGGER.debug("預加載翻譯完成: {} -> {}", item, translation);
-                })
-                .exceptionally(throwable -> {
-                    LOGGER.warn("預加載翻譯失敗: {}", item, throwable);
-                    return null;
-                });
-        }
     }
 }

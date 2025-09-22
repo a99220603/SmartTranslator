@@ -22,7 +22,9 @@ import java.nio.charset.StandardCharsets;
  */
 public class GoogleAIStudioAPI implements TranslationAPI {
     private static final Logger LOGGER = LoggerFactory.getLogger(GoogleAIStudioAPI.class);
-    private static final String API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent";
+    private static final String API_BASE_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent";
+    private static final int MAX_RETRIES = 3;
+    private static final long RETRY_DELAY_MS = 1000;
     
     @Override
     public String translate(String text, String targetLanguage) throws Exception {
@@ -30,6 +32,30 @@ public class GoogleAIStudioAPI implements TranslationAPI {
         if (apiKey == null || apiKey.trim().isEmpty()) {
             throw new IllegalStateException("Google AI Studio API 金鑰未設定");
         }
+        
+        Exception lastException = null;
+        for (int attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                return performTranslation(text, targetLanguage, apiKey);
+            } catch (Exception e) {
+                lastException = e;
+                LOGGER.warn("翻譯嘗試 {}/{} 失敗: {}", attempt, MAX_RETRIES, e.getMessage());
+                
+                if (attempt < MAX_RETRIES) {
+                    try {
+                        Thread.sleep(RETRY_DELAY_MS * attempt); // 指數退避
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new Exception("翻譯被中斷", ie);
+                    }
+                }
+            }
+        }
+        
+        throw new Exception("翻譯失敗，已重試 " + MAX_RETRIES + " 次", lastException);
+    }
+    
+    private String performTranslation(String text, String targetLanguage, String apiKey) throws Exception {
         
         // 構建請求URL
         String requestUrl = API_BASE_URL + "?key=" + URLEncoder.encode(apiKey, StandardCharsets.UTF_8);
@@ -115,7 +141,26 @@ public class GoogleAIStudioAPI implements TranslationAPI {
         JsonObject generationConfig = new JsonObject();
         generationConfig.addProperty("temperature", 0.1);
         generationConfig.addProperty("maxOutputTokens", 1000);
+        generationConfig.addProperty("topP", 0.8);
+        generationConfig.addProperty("topK", 10);
         requestBody.add("generationConfig", generationConfig);
+        
+        // 設定安全設置
+        JsonArray safetySettings = new JsonArray();
+        String[] categories = {
+            "HARM_CATEGORY_HARASSMENT",
+            "HARM_CATEGORY_HATE_SPEECH", 
+            "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            "HARM_CATEGORY_DANGEROUS_CONTENT"
+        };
+        
+        for (String category : categories) {
+            JsonObject safetySetting = new JsonObject();
+            safetySetting.addProperty("category", category);
+            safetySetting.addProperty("threshold", "BLOCK_MEDIUM_AND_ABOVE");
+            safetySettings.add(safetySetting);
+        }
+        requestBody.add("safetySettings", safetySettings);
         
         return requestBody;
     }
@@ -127,10 +172,29 @@ public class GoogleAIStudioAPI implements TranslationAPI {
         try {
             JsonObject response = JsonParser.parseString(jsonResponse).getAsJsonObject();
             
+            // 檢查是否有錯誤
+            if (response.has("error")) {
+                JsonObject error = response.getAsJsonObject("error");
+                String errorMessage = error.has("message") ? error.get("message").getAsString() : "未知錯誤";
+                int errorCode = error.has("code") ? error.get("code").getAsInt() : -1;
+                throw new Exception("API 錯誤 (" + errorCode + "): " + errorMessage);
+            }
+            
             if (response.has("candidates")) {
                 JsonArray candidates = response.getAsJsonArray("candidates");
                 if (candidates.size() > 0) {
                     JsonObject candidate = candidates.get(0).getAsJsonObject();
+                    
+                    // 檢查是否被安全過濾器阻擋
+                    if (candidate.has("finishReason")) {
+                        String finishReason = candidate.get("finishReason").getAsString();
+                        if ("SAFETY".equals(finishReason)) {
+                            throw new Exception("內容被安全過濾器阻擋");
+                        } else if ("RECITATION".equals(finishReason)) {
+                            throw new Exception("內容可能包含重複內容");
+                        }
+                    }
+                    
                     if (candidate.has("content")) {
                         JsonObject content = candidate.getAsJsonObject("content");
                         if (content.has("parts")) {
@@ -138,7 +202,10 @@ public class GoogleAIStudioAPI implements TranslationAPI {
                             if (parts.size() > 0) {
                                 JsonObject part = parts.get(0).getAsJsonObject();
                                 if (part.has("text")) {
-                                    return part.get("text").getAsString().trim();
+                                    String translatedText = part.get("text").getAsString().trim();
+                                    // 移除可能的引號或格式化字符
+                                    translatedText = translatedText.replaceAll("^[\"'`]+|[\"'`]+$", "");
+                                    return translatedText;
                                 }
                             }
                         }
@@ -151,6 +218,9 @@ public class GoogleAIStudioAPI implements TranslationAPI {
             throw new Exception("無法解析翻譯響應");
             
         } catch (Exception e) {
+            if (e.getMessage().startsWith("API 錯誤") || e.getMessage().startsWith("內容被")) {
+                throw e; // 重新拋出已知錯誤
+            }
             LOGGER.error("解析 Google AI Studio 響應時發生錯誤: {}", jsonResponse, e);
             throw new Exception("解析翻譯響應失敗: " + e.getMessage());
         }

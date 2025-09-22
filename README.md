@@ -1,7 +1,7 @@
 
 # Smart Translator MOD 🌐
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/yourusername/SmartTranslator)
+[![Version](https://img.shields.io/badge/version-2.0.1-blue.svg)](https://github.com/yourusername/SmartTranslator)
 [![Minecraft](https://img.shields.io/badge/minecraft-1.21.4-green.svg)](https://minecraft.net/)
 [![NeoForge](https://img.shields.io/badge/neoforge-21.4.154-orange.svg)](https://neoforged.net/)
 
