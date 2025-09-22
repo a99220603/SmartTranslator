@@ -148,9 +148,8 @@ SmartTranslator/
 
 ## 📞 聯絡方式
 
-- 作者：SmartTranslator Team
-- 問題回報：[GitHub Issues](https://github.com/yourusername/SmartTranslator/issues)
-
+- 作者：AI編寫老鼠
+- 問題回報：a99220603@gmail.com
 ## 🙏 致謝
 
 感謝所有為本專案做出貢獻的開發者和使用者！
