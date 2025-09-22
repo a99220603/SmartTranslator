@@ -1,0 +1,29 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "MIT"
+
+[[mods]]
+modId = "smarttranslator"
+version = "${file.jarVersion}"
+displayName = "Smart Translator"
+description = '''
+智能翻譯 MOD - 提供本地緩存的自動翻譯功能
+支援多種翻譯引擎，包含聊天、告示牌、書籍等內容的翻譯
+具備完整的 GUI 管理介面和配置系統
+'''
+authors = "SmartTranslator Team"
+displayURL = "https://github.com/smarttranslator/smarttranslator"
+
+[[dependencies.smarttranslator]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.4.0,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.smarttranslator]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.4,1.22)"
+ordering = "NONE"
+side = "BOTH"

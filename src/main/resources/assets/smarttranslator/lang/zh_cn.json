@@ -1,0 +1,24 @@
+{
+  "key.categories.smarttranslator": "智能翻譯",
+  "key.smarttranslator.open_gui": "打開翻譯管理器",
+  
+  "smarttranslator.config.title": "智能翻譯配置",
+  "smarttranslator.config.enabled": "啟用翻譯",
+  "smarttranslator.config.enabled.tooltip": "啟用或停用自動翻譯功能",
+  "smarttranslator.config.target_language": "目標語言",
+  "smarttranslator.config.target_language.tooltip": "翻譯目標語言代碼（如：zh-cn、en、ja）",
+  "smarttranslator.config.translate_chat": "翻譯聊天",
+  "smarttranslator.config.translate_chat.tooltip": "自動翻譯聊天訊息",
+  "smarttranslator.config.translate_signs": "翻譯告示牌",
+  "smarttranslator.config.translate_signs.tooltip": "自動翻譯告示牌文字",
+  "smarttranslator.config.translate_books": "翻譯書籍",
+  "smarttranslator.config.translate_books.tooltip": "自動翻譯書籍內容",
+  "smarttranslator.config.cache_enabled": "啟用緩存",
+  "smarttranslator.config.cache_enabled.tooltip": "啟用本地翻譯緩存",
+  "smarttranslator.config.cache_size": "緩存大小",
+  "smarttranslator.config.cache_size.tooltip": "最大緩存翻譯數量",
+  "smarttranslator.config.show_original": "顯示原文",
+  "smarttranslator.config.show_original.tooltip": "在翻譯旁顯示原始文字",
+  "smarttranslator.config.translation_delay": "翻譯延遲",
+  "smarttranslator.config.translation_delay.tooltip": "翻譯前的延遲時間（毫秒）"
+}
