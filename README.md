@@ -4,6 +4,7 @@
 [![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/yourusername/SmartTranslator)
 [![Minecraft](https://img.shields.io/badge/minecraft-1.21.4-green.svg)](https://minecraft.net/)
 [![NeoForge](https://img.shields.io/badge/neoforge-21.4.154-orange.svg)](https://neoforged.net/)
+[![paypal](https://www.paypal.com/ncp/payment/YWQBRX9FYM63U)](PayPal)
 
 智能翻譯 MOD - 為 Minecraft 提供高性能的實時翻譯功能，支援本地緩存的自動翻譯系統。
 
