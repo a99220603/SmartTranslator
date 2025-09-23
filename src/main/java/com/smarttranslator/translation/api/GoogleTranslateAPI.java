@@ -12,6 +12,10 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Google 翻譯 API 實現
@@ -21,14 +25,22 @@ public class GoogleTranslateAPI implements TranslationAPI {
     private static final Logger LOGGER = LoggerFactory.getLogger(GoogleTranslateAPI.class);
     private static final String API_URL = "https://translate.googleapis.com/translate_a/single";
     
+    // 占位符保護模式
+    private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\[FORMAT\\]", Pattern.CASE_INSENSITIVE);
+    private static final String PROTECTED_PREFIX = "ZZPROTECTEDPLACEHOLDERZZZ";
+    
     @Override
     public String translate(String text, String targetLanguage) throws Exception {
         if (text == null || text.trim().isEmpty()) {
             return text;
         }
         
+        // 保護占位符
+        Map<String, String> placeholderMap = new HashMap<>();
+        String protectedText = protectPlaceholders(text, placeholderMap);
+        
         // 構建請求 URL
-        String encodedText = URLEncoder.encode(text, StandardCharsets.UTF_8);
+        String encodedText = URLEncoder.encode(protectedText, StandardCharsets.UTF_8);
         String url = String.format("%s?client=gtx&sl=auto&tl=%s&dt=t&q=%s", 
                 API_URL, targetLanguage, encodedText);
         
@@ -56,7 +68,41 @@ public class GoogleTranslateAPI implements TranslationAPI {
         }
         
         // 解析 JSON 響應
-        return parseTranslationResponse(response.toString());
+        String translatedText = parseTranslationResponse(response.toString());
+        
+        // 恢復占位符
+        return restorePlaceholders(translatedText, placeholderMap);
+    }
+    
+    /**
+     * 保護占位符，將其替換為不會被翻譯的標記
+     */
+    private String protectPlaceholders(String text, Map<String, String> placeholderMap) {
+        Matcher matcher = PLACEHOLDER_PATTERN.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        int counter = 0;
+        
+        while (matcher.find()) {
+            String placeholder = matcher.group();
+            String protectedToken = PROTECTED_PREFIX + counter + "ZZEND";
+            placeholderMap.put(protectedToken, placeholder);
+            matcher.appendReplacement(sb, protectedToken);
+            counter++;
+        }
+        matcher.appendTail(sb);
+        
+        return sb.toString();
+    }
+    
+    /**
+     * 恢復占位符
+     */
+    private String restorePlaceholders(String text, Map<String, String> placeholderMap) {
+        String result = text;
+        for (Map.Entry<String, String> entry : placeholderMap.entrySet()) {
+            result = result.replace(entry.getKey(), entry.getValue());
+        }
+        return result;
     }
     
     /**

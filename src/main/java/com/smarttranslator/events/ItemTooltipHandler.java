@@ -6,6 +6,7 @@ import com.smarttranslator.translation.ItemTranslationService;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
@@ -79,7 +80,68 @@ public class ItemTooltipHandler {
             }
         }
     }
-    
+
+    /**
+     * 調整過亮的顏色為較柔和的顏色
+     * 將常見的亮色調整為較暗的版本，提供更好的視覺體驗
+     */
+    private net.minecraft.network.chat.Style adjustBrightColors(net.minecraft.network.chat.Style originalStyle) {
+        if (originalStyle == null) {
+            return null;
+        }
+        
+        var color = originalStyle.getColor();
+        if (color == null) {
+            return originalStyle;
+        }
+        
+        // 獲取顏色值
+        int colorValue = color.getValue();
+        
+        // 調整常見的亮色
+        int adjustedColor = switch (colorValue) {
+            case 0xFFFF55 -> 0xCCCC44; // 亮黃色 -> 較暗的黃色
+            case 0x55FFFF -> 0x44CCCC; // 亮青色 -> 較暗的青色  
+            case 0x55FF55 -> 0x44CC44; // 亮綠色 -> 較暗的綠色
+            case 0xFF5555 -> 0xCC4444; // 亮紅色 -> 較暗的紅色
+            case 0xFF55FF -> 0xCC44CC; // 亮紫色 -> 較暗的紫色
+            case 0x5555FF -> 0x4444CC; // 亮藍色 -> 較暗的藍色
+            case 0xFFFFFF -> 0xE0E0E0; // 純白色 -> 淺灰色
+            case 0xFFFF00 -> 0xCCCC00; // 純黃色 -> 較暗的黃色
+            case 0x00FFFF -> 0x00CCCC; // 純青色 -> 較暗的青色
+            case 0x00FF00 -> 0x00CC00; // 純綠色 -> 較暗的綠色
+            case 0xFF0000 -> 0xCC0000; // 純紅色 -> 較暗的紅色
+            case 0xFF00FF -> 0xCC00CC; // 純紫色 -> 較暗的紫色
+            case 0x0000FF -> 0x0000CC; // 純藍色 -> 較暗的藍色
+            default -> {
+                // 對於其他顏色，檢查是否過亮並適當調暗
+                int r = (colorValue >> 16) & 0xFF;
+                int g = (colorValue >> 8) & 0xFF;
+                int b = colorValue & 0xFF;
+                
+                // 計算亮度 (使用標準亮度公式)
+                double brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0;
+                
+                // 如果亮度超過 0.8，則調暗 20%
+                if (brightness > 0.8) {
+                    r = (int) (r * 0.8);
+                    g = (int) (g * 0.8);
+                    b = (int) (b * 0.8);
+                    yield (r << 16) | (g << 8) | b;
+                } else {
+                    yield colorValue;
+                }
+            }
+        };
+        
+        // 如果顏色有變化，創建新的樣式
+        if (adjustedColor != colorValue) {
+            return originalStyle.withColor(net.minecraft.network.chat.TextColor.fromRgb(adjustedColor));
+        }
+        
+        return originalStyle;
+    }
+
     /**
      * 高性能非阻塞tooltip處理（簡化版本）
      * 主要優化：
@@ -224,24 +286,229 @@ public class ItemTooltipHandler {
     }
     
     /**
-     * 創建雙語顯示組件（優化版本）
-     * 減少對象創建，提升性能
+     * 創建雙語顯示組件，格式為：繁體中文  [英文原文]
+     * 繁體中文保持原始顏色，英文原文使用灰色以便區分
+     * 在繁體中文和英文原文之間添加適當空格以提高可讀性
+     * 所有文字均使用粗體顯示以提高視覺效果
+     * 添加智能文字長度檢查和換行功能
+     * 根據配置決定是否顯示原文
      */
     private MutableComponent createBilingualComponent(String originalText, String translatedText, Component originalComponent) {
         try {
-            // 保持原始樣式
-            MutableComponent result = Component.literal(translatedText).withStyle(originalComponent.getStyle());
+            // 獲取原始組件的樣式，確保保留所有格式信息
+            Style originalStyle = originalComponent.getStyle();
             
-            // 只在調試模式下添加原文
-            if (LOGGER.isDebugEnabled()) {
-                result.append(Component.literal(" (" + originalText + ")").withStyle(ChatFormatting.GRAY));
+            // 檢查是否應該顯示原文
+            boolean showOriginal = SmartTranslatorConfig.SHOW_ORIGINAL_TEXT.get();
+            
+            // 如果不顯示原文，直接返回翻譯文字
+            if (!showOriginal) {
+                return createTranslationOnlyComponent(translatedText, originalStyle);
             }
             
-            return result;
+            // 計算文字顯示寬度（中文字符按2個單位計算，英文按1個單位）
+            int translatedWidth = calculateDisplayWidth(translatedText);
+            int originalWidth = calculateDisplayWidth(originalText);
+            int separatorWidth = 4; // "  [" + "]" 的寬度
+            int totalWidth = translatedWidth + separatorWidth + originalWidth;
+            
+            // 調整寬度限制以提高可讀性（大幅增加文字顯示空間）
+            final int MAX_TOOLTIP_WIDTH = 50; // 大幅增加到50個顯示單位，提供更多空間
+            final int MAX_SINGLE_LINE_WIDTH = 45; // 單行文字最大寬度大幅增加到45
+            
+            // 如果文字過長，使用簡化格式或換行
+            if (totalWidth > MAX_TOOLTIP_WIDTH) {
+                // 檢查是否可以通過縮短分隔符來解決
+                int shortTotalWidth = translatedWidth + 3 + originalWidth; // " [" + "]"
+                if (shortTotalWidth <= MAX_TOOLTIP_WIDTH) {
+                    // 使用較短的分隔符
+                    return createShortBilingualComponent(originalText, translatedText, originalStyle);
+                } else if (translatedWidth <= MAX_SINGLE_LINE_WIDTH) {
+                    // 如果翻譯文字本身不太長，將原文放到下一行
+                    return createMultilineBilingualComponent(originalText, translatedText, originalStyle);
+                } else {
+                    // 如果翻譯文字也很長，只顯示翻譯文字
+                    return createTranslationOnlyComponent(translatedText, originalStyle);
+                }
+            }
+            
+            // 文字長度適中，使用標準格式
+            return createStandardBilingualComponent(originalText, translatedText, originalStyle);
         } catch (Exception e) {
-            // 發生錯誤時返回原始組件
-            return Component.literal(originalText).withStyle(originalComponent.getStyle());
+            LOGGER.warn("創建雙語組件時發生錯誤: {}", e.getMessage());
+            // 發生錯誤時返回原始組件，保持原始樣式並添加粗體
+            if (originalComponent instanceof MutableComponent) {
+                MutableComponent mutableComp = (MutableComponent) originalComponent;
+                Style currentStyle = mutableComp.getStyle();
+                if (currentStyle != null && !currentStyle.isEmpty()) {
+                    return mutableComp.withStyle(currentStyle.withBold(true));
+                } else {
+                    return mutableComp.withStyle(ChatFormatting.BOLD);
+                }
+            } else {
+                Style style = originalComponent.getStyle();
+                MutableComponent fallback = Component.literal(originalText);
+                if (style != null && !style.isEmpty()) {
+                    return fallback.withStyle(style.withBold(true));
+                } else {
+                    return fallback.withStyle(ChatFormatting.BOLD);
+                }
+            }
         }
+    }
+    
+    /**
+     * 計算文字的顯示寬度（中文字符按2個單位計算，英文按1個單位）
+     */
+    private int calculateDisplayWidth(String text) {
+        if (text == null || text.isEmpty()) {
+            return 0;
+        }
+        
+        int width = 0;
+        for (char c : text.toCharArray()) {
+            // 判斷是否為中文字符（包括繁體中文、簡體中文、日文漢字等）
+            if (isCJKCharacter(c)) {
+                width += 2; // 中文字符佔2個顯示單位
+            } else {
+                width += 1; // 英文字符佔1個顯示單位
+            }
+        }
+        return width;
+    }
+    
+    /**
+     * 判斷字符是否為CJK（中日韓）字符
+     */
+    private boolean isCJKCharacter(char c) {
+        // Unicode範圍包含中文、日文漢字、韓文等
+        return (c >= 0x4E00 && c <= 0x9FFF) ||    // CJK統一漢字
+               (c >= 0x3400 && c <= 0x4DBF) ||    // CJK擴展A
+               (c >= 0x20000 && c <= 0x2A6DF) ||  // CJK擴展B
+               (c >= 0x2A700 && c <= 0x2B73F) ||  // CJK擴展C
+               (c >= 0x2B740 && c <= 0x2B81F) ||  // CJK擴展D
+               (c >= 0x2B820 && c <= 0x2CEAF) ||  // CJK擴展E
+               (c >= 0x3000 && c <= 0x303F) ||    // CJK符號和標點
+               (c >= 0xFF00 && c <= 0xFFEF);      // 全角字符
+    }
+    
+    /**
+     * 創建標準格式的雙語組件：繁體中文  [英文原文]
+     */
+    private MutableComponent createStandardBilingualComponent(String originalText, String translatedText, Style originalStyle) {
+        // 創建翻譯文字部分，保持原有樣式但不添加額外格式
+        MutableComponent result = Component.literal(translatedText);
+        if (originalStyle != null && !originalStyle.isEmpty()) {
+            // 保持原有樣式，但移除可能造成混亂的格式
+            Style cleanStyle = Style.EMPTY
+                .withColor(originalStyle.getColor())
+                .withBold(false); // 移除粗體避免重疊
+            result = result.withStyle(cleanStyle);
+        }
+        
+        // 添加英文對照，使用簡潔的深灰色
+        result.append(Component.literal(" [").withStyle(ChatFormatting.DARK_GRAY));
+        result.append(Component.literal(originalText).withStyle(ChatFormatting.DARK_GRAY));
+        result.append(Component.literal("]").withStyle(ChatFormatting.DARK_GRAY));
+        
+        return result;
+    }
+    
+    /**
+     * 創建短分隔符格式的雙語組件：繁體中文 [英文原文]
+     */
+    private MutableComponent createShortBilingualComponent(String originalText, String translatedText, Style originalStyle) {
+        // 創建翻譯文字部分，保持原有樣式但不添加額外格式
+        MutableComponent result = Component.literal(translatedText);
+        if (originalStyle != null && !originalStyle.isEmpty()) {
+            // 保持原有樣式，但移除可能造成混亂的格式
+            Style cleanStyle = Style.EMPTY
+                .withColor(originalStyle.getColor())
+                .withBold(false); // 移除粗體避免重疊
+            result = result.withStyle(cleanStyle);
+        }
+        
+        // 添加英文對照，使用簡潔的深灰色和短分隔符
+        result.append(Component.literal(" [").withStyle(ChatFormatting.DARK_GRAY));
+        result.append(Component.literal(originalText).withStyle(ChatFormatting.DARK_GRAY));
+        result.append(Component.literal("]").withStyle(ChatFormatting.DARK_GRAY));
+        
+        return result;
+    }
+    
+    /**
+     * 創建多行格式的雙語組件：
+     * 繁體中文
+     * [英文原文]
+     */
+    private MutableComponent createMultilineBilingualComponent(String originalText, String translatedText, Style originalStyle) {
+        // 創建翻譯文字部分，保持原有樣式但不添加額外格式
+        MutableComponent result = Component.literal(translatedText);
+        if (originalStyle != null && !originalStyle.isEmpty()) {
+            // 保持原有樣式，但移除可能造成混亂的格式
+            Style cleanStyle = Style.EMPTY
+                .withColor(originalStyle.getColor())
+                .withBold(false); // 移除粗體避免重疊
+            result = result.withStyle(cleanStyle);
+        }
+        
+        // 檢查原文長度，如果太長則截斷
+        String displayOriginalText = originalText;
+        if (calculateDisplayWidth(originalText) > 40) { // 原文行最大40個顯示單位，大幅增加可讀性
+            displayOriginalText = truncateText(originalText, 37) + "..."; // 大幅增加截斷長度到37
+        }
+        
+        // 添加換行符和原文（使用統一的深灰色樣式）
+        result.append(Component.literal("\n[").withStyle(ChatFormatting.DARK_GRAY));
+        result.append(Component.literal(displayOriginalText).withStyle(ChatFormatting.DARK_GRAY));
+        result.append(Component.literal("]").withStyle(ChatFormatting.DARK_GRAY));
+        
+        return result;
+    }
+    
+    /**
+     * 截斷文字到指定的顯示寬度
+     */
+    private String truncateText(String text, int maxDisplayWidth) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        
+        StringBuilder result = new StringBuilder();
+        int currentWidth = 0;
+        
+        for (char c : text.toCharArray()) {
+            int charWidth = isCJKCharacter(c) ? 2 : 1;
+            if (currentWidth + charWidth > maxDisplayWidth) {
+                break;
+            }
+            result.append(c);
+            currentWidth += charWidth;
+        }
+        
+        return result.toString();
+    }
+    
+    /**
+     * 創建僅翻譯文字的組件（當文字過長時使用）
+     */
+    private MutableComponent createTranslationOnlyComponent(String translatedText, Style originalStyle) {
+        // 檢查翻譯文字長度，如果太長則截斷
+        String displayTranslatedText = translatedText;
+        if (calculateDisplayWidth(translatedText) > 45) { // 單行最大45個顯示單位，大幅增加可讀性
+            displayTranslatedText = truncateText(translatedText, 42) + "..."; // 大幅增加截斷長度到42
+        }
+        
+        MutableComponent result = Component.literal(displayTranslatedText);
+        if (originalStyle != null && !originalStyle.isEmpty()) {
+            // 保持原有樣式，但移除可能造成混亂的格式
+            Style cleanStyle = Style.EMPTY
+                .withColor(originalStyle.getColor())
+                .withBold(false); // 移除粗體避免重疊
+            result = result.withStyle(cleanStyle);
+        }
+        
+        return result;
     }
     
     /**

@@ -65,11 +65,16 @@ public class TranslationManager {
             return CompletableFuture.completedFuture(text);
         }
         
+        // 預處理文本（處理特殊符號和格式化代碼）
+        String originalText = text;
+        String processedText = MinecraftTextProcessor.preprocessText(text);
+        
         // 檢查緩存
         String targetLanguage = SmartTranslatorConfig.TARGET_LANGUAGE.get();
-        String cached = cache.getCachedTranslation(text, targetLanguage);
+        String cached = cache.getCachedTranslation(processedText, targetLanguage);
         if (cached != null) {
-            return CompletableFuture.completedFuture(formatTranslation(cached, text));
+            String result = MinecraftTextProcessor.postprocessText(cached, originalText);
+            return CompletableFuture.completedFuture(formatTranslation(result, originalText));
         }
         
         // 使用速率限制器控制翻譯請求
@@ -81,10 +86,12 @@ public class TranslationManager {
                     return text; // 返回原文
                 }
                 
-                String result = currentAPI.translate(text, targetLanguage);
-                if (result != null && !result.equals(text)) {
-                    String formatted = formatTranslation(result, text);
-                    cache.addToCache(text, result, targetLanguage);
+                String result = currentAPI.translate(processedText, targetLanguage);
+                if (result != null && !result.equals(processedText)) {
+                    // 後處理翻譯結果
+                    String postProcessed = MinecraftTextProcessor.postprocessText(result, originalText);
+                    String formatted = formatTranslation(postProcessed, originalText);
+                    cache.addToCache(processedText, result, targetLanguage);
                     return formatted;
                 }
                 return text;
@@ -129,24 +136,30 @@ public class TranslationManager {
             return originalText;
         }
         
+        // 預處理文本（處理特殊符號和格式化代碼）
+        String processedText = MinecraftTextProcessor.preprocessText(originalText);
+        
         String targetLanguage = SmartTranslatorConfig.TARGET_LANGUAGE.get();
         
         // 先檢查緩存
-        String cachedResult = cache.getCachedTranslation(originalText, targetLanguage);
+        String cachedResult = cache.getCachedTranslation(processedText, targetLanguage);
         if (cachedResult != null) {
-            return formatTranslation(cachedResult, originalText);
+            String postProcessed = MinecraftTextProcessor.postprocessText(cachedResult, originalText);
+            return formatTranslation(postProcessed, originalText);
         }
         
         // 使用速率限制器（阻塞等待）
         try {
             rateLimiter.acquire(); // 阻塞等待令牌
             
-            String translatedText = currentAPI.translate(originalText, targetLanguage);
+            String translatedText = currentAPI.translate(processedText, targetLanguage);
             
-            if (translatedText != null && !translatedText.equals(originalText)) {
+            if (translatedText != null && !translatedText.equals(processedText)) {
+                // 後處理翻譯結果
+                String postProcessed = MinecraftTextProcessor.postprocessText(translatedText, originalText);
                 // 添加到緩存
-                cache.addToCache(originalText, translatedText, targetLanguage);
-                return formatTranslation(translatedText, originalText);
+                cache.addToCache(processedText, translatedText, targetLanguage);
+                return formatTranslation(postProcessed, originalText);
             }
         } catch (Exception e) {
             LOGGER.error("API 翻譯失敗: {}", originalText, e);
@@ -195,16 +208,34 @@ public class TranslationManager {
     private String formatTranslation(String translatedText, String originalText) {
         StringBuilder result = new StringBuilder();
         
-        // 添加翻譯前綴
-        if (SmartTranslatorConfig.SHOW_TRANSLATION_STATUS.get()) {
-            result.append(SmartTranslatorConfig.TRANSLATION_PREFIX.get());
-        }
+        // 檢查是否需要顯示原文
+        boolean showOriginal = SmartTranslatorConfig.SHOW_ORIGINAL_TEXT.get();
+        boolean showStatus = SmartTranslatorConfig.SHOW_TRANSLATION_STATUS.get();
         
-        result.append(translatedText);
-        
-        // 是否顯示原始文字
-        if (SmartTranslatorConfig.SHOW_ORIGINAL_TEXT.get()) {
-            result.append(" (").append(originalText).append(")");
+        if (showOriginal && showStatus) {
+            // 同時顯示狀態和原文時，使用更清晰的格式
+            result.append("§6[原文]§r ").append(originalText)
+                  .append(" §a→§r ").append(translatedText);
+        } else if (showOriginal) {
+            // 只顯示原文對照時，使用簡潔格式
+            result.append("§7").append(originalText).append("§r → ").append(translatedText);
+        } else {
+            // 只顯示翻譯結果 - 改善顏色處理
+            if (showStatus) {
+                String prefix = SmartTranslatorConfig.TRANSLATION_PREFIX.get();
+                // 如果翻譯文本已經包含顏色代碼，不添加前綴顏色
+                if (translatedText.matches(".*§[0-9a-fk-or].*")) {
+                    result.append(prefix);
+                } else {
+                    result.append(prefix);
+                }
+            }
+            result.append(translatedText);
+            
+            // 確保在翻譯結束後重置格式，避免影響後續文本
+            if (!translatedText.endsWith("§r")) {
+                result.append("§r");
+            }
         }
         
         return result.toString();

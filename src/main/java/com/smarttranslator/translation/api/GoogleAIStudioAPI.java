@@ -15,6 +15,10 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Google AI Studio (Gemini API) 翻譯實現
@@ -25,6 +29,10 @@ public class GoogleAIStudioAPI implements TranslationAPI {
     private static final String API_BASE_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent";
     private static final int MAX_RETRIES = 3;
     private static final long RETRY_DELAY_MS = 1000;
+    
+    // 占位符保護模式
+    private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\[FORMAT\\]", Pattern.CASE_INSENSITIVE);
+    private static final String PROTECTED_PREFIX = "ZZPROTECTEDPLACEHOLDERZZZ";
     
     @Override
     public String translate(String text, String targetLanguage) throws Exception {
@@ -57,11 +65,15 @@ public class GoogleAIStudioAPI implements TranslationAPI {
     
     private String performTranslation(String text, String targetLanguage, String apiKey) throws Exception {
         
+        // 保護占位符
+        Map<String, String> placeholderMap = new HashMap<>();
+        String protectedText = protectPlaceholders(text, placeholderMap);
+        
         // 構建請求URL
         String requestUrl = API_BASE_URL + "?key=" + URLEncoder.encode(apiKey, StandardCharsets.UTF_8);
         
         // 構建請求體
-        JsonObject requestBody = buildRequestBody(text, targetLanguage);
+        JsonObject requestBody = buildRequestBody(protectedText, targetLanguage);
         
         // 發送HTTP請求
         HttpURLConnection connection = null;
@@ -90,7 +102,10 @@ public class GoogleAIStudioAPI implements TranslationAPI {
                     while ((line = reader.readLine()) != null) {
                         response.append(line);
                     }
-                    return parseTranslationResponse(response.toString());
+                    String translatedText = parseTranslationResponse(response.toString());
+                    
+                    // 恢復占位符
+                    return restorePlaceholders(translatedText, placeholderMap);
                 }
             } else {
                 // 讀取錯誤響應
@@ -113,15 +128,46 @@ public class GoogleAIStudioAPI implements TranslationAPI {
     }
     
     /**
+     * 保護占位符，將其替換為不會被翻譯的標記
+     */
+    private String protectPlaceholders(String text, Map<String, String> placeholderMap) {
+        Matcher matcher = PLACEHOLDER_PATTERN.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        int counter = 0;
+        
+        while (matcher.find()) {
+            String placeholder = matcher.group();
+            String protectedToken = PROTECTED_PREFIX + counter + "ZZEND";
+            placeholderMap.put(protectedToken, placeholder);
+            matcher.appendReplacement(sb, protectedToken);
+            counter++;
+        }
+        matcher.appendTail(sb);
+        
+        return sb.toString();
+    }
+    
+    /**
+     * 恢復占位符
+     */
+    private String restorePlaceholders(String text, Map<String, String> placeholderMap) {
+        String result = text;
+        for (Map.Entry<String, String> entry : placeholderMap.entrySet()) {
+            result = result.replace(entry.getKey(), entry.getValue());
+        }
+        return result;
+    }
+    
+    /**
      * 構建請求體
      */
     private JsonObject buildRequestBody(String text, String targetLanguage) {
         // 將語言代碼轉換為語言名稱
         String languageName = getLanguageName(targetLanguage);
         
-        // 構建提示詞
+        // 構建提示詞，特別強調不要翻譯占位符
         String prompt = String.format(
-            "請將以下文字翻譯成%s，只返回翻譯結果，不要添加任何解釋或額外內容：\n\n%s",
+            "請將以下文字翻譯成%s。注意：請保持所有以ZZPROTECTEDPLACEHOLDERZZZ開頭和ZZEND結尾的標記不變，不要翻譯它們。只返回翻譯結果，不要添加任何解釋或額外內容：\n\n%s",
             languageName, text
         );
         

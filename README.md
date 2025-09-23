@@ -1,7 +1,7 @@
 
 # Smart Translator MOD 🌐
 
-[![Version](https://img.shields.io/badge/version-2.0.1-blue.svg)](https://github.com/yourusername/SmartTranslator)
+[![Version](https://img.shields.io/badge/version-2.3.4-blue.svg)](https://github.com/a99220603/SmartTranslator)
 [![Minecraft](https://img.shields.io/badge/minecraft-1.21.4-green.svg)](https://minecraft.net/)
 [![NeoForge](https://img.shields.io/badge/neoforge-21.4.154-orange.svg)](https://neoforged.net/)
 
@@ -36,9 +36,34 @@
 - NeoForge 21.4.154 或更高版本
 
 ### 安裝步驟
-1. 下載最新版本的 `smarttranslator-2.0.0.jar`
+1. 下載最新版本的 `smarttranslator-2.3.4.jar`
 2. 將 JAR 文件放入 Minecraft 的 `mods` 資料夾
 3. 啟動遊戲即可使用
+
+## 新功能：Minecraft 顏色代碼保留
+
+SmartTranslator 現在支持在翻譯過程中保留 Minecraft 的顏色代碼和格式化代碼！
+
+### 主要特性
+- 🎨 **完整的顏色支持**: 支持所有 16 種 Minecraft 顏色代碼 (`§0`-`§f`)
+- ✨ **格式化代碼**: 支持粗體、斜體、下劃線、刪除線等格式代碼
+- 🧠 **智能映射**: 自動將格式代碼映射到翻譯後的文本
+- 🔄 **降級處理**: 當智能處理失敗時自動使用基本恢復模式
+- ⚡ **性能優化**: 只對包含格式化代碼的文本進行特殊處理
+
+### 使用示例
+```java
+// 原文: "§aHello §bWorld!"
+// 翻譯: "你好 世界!"
+// 結果: "§a你好 §b世界!"
+
+String result = MinecraftTextProcessor.postprocessText("你好 世界!", "§aHello §bWorld!");
+```
+
+### 詳細文檔
+查看 [COLOR_PRESERVATION_GUIDE.md](COLOR_PRESERVATION_GUIDE.md) 獲取完整的使用指南和 API 文檔。
+
+---
 
 ## 🎮 使用方法
 
@@ -79,6 +104,12 @@ private final ExecutorService translationExecutor = Executors.newFixedThreadPool
 ```
 
 ## 📈 版本歷史
+
+### v2.3.4 (2025-01-24) - 顯示優化版本
+- 🎨 **Tooltip 顯示優化**：調整文字寬度限制，提升可讀性
+- 🔧 **格式統一**：統一雙語顯示格式，移除視覺混淆
+- 🎯 **英文對照**：預設顯示英文對照，便於理解
+- 📏 **智能截斷**：優化長文本顯示邏輯
 
 ### v2.0.0 (2025-09-22) - 性能革命
 - 🚀 **重大性能優化**：移除 2 秒延遲，實現零延遲響應

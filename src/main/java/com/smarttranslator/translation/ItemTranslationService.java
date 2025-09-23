@@ -146,20 +146,6 @@ public class ItemTranslationService {
     }
     
     /**
-     * 獲取緩存的翻譯結果
-     */
-    public String getCachedTranslation(String originalText) {
-        return translationManager.getCachedTranslation(originalText);
-    }
-    
-    /**
-     * 檢查是否有緩存的翻譯
-     */
-    public boolean hasCachedTranslation(String originalText) {
-        return translationManager.hasCachedTranslation(originalText);
-    }
-    
-    /**
      * 檢查物品是否應該被翻譯
      */
     public boolean shouldTranslateItem(ItemStack itemStack) {
@@ -181,5 +167,19 @@ public class ItemTranslationService {
         }
         
         return true;
+    }
+    
+    /**
+     * 獲取緩存的翻譯結果
+     */
+    public String getCachedTranslation(String originalText) {
+        return translationManager.getCachedTranslation(originalText);
+    }
+    
+    /**
+     * 檢查是否有緩存的翻譯
+     */
+    public boolean hasCachedTranslation(String originalText) {
+        return translationManager.hasCachedTranslation(originalText);
     }
 }

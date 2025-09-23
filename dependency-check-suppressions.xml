@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+    <!-- 
+    此文件用於抑制已知的誤報或已接受的風險
+    每個抑制項都應該包含詳細的註釋說明原因
+    -->
+    
+    <!-- 示例：抑制特定CVE -->
+    <!--
+    <suppress>
+        <notes><![CDATA[
+        CVE-2021-44228 (Log4j) - 我們使用的是安全版本
+        ]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.logging\.log4j/.*@.*$</packageUrl>
+        <cve>CVE-2021-44228</cve>
+    </suppress>
+    -->
+    
+    <!-- 示例：抑制測試依賴的漏洞 -->
+    <!--
+    <suppress>
+        <notes><![CDATA[
+        測試依賴不會部署到生產環境
+        ]]></notes>
+        <filePath regex="true">.*test.*</filePath>
+    </suppress>
+    -->
+</suppressions>

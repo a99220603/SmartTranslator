@@ -31,6 +31,7 @@ public class TranslationCache {
     private final Map<String, CachedTranslation> cache = new ConcurrentHashMap<>();
     private final Path cacheFilePath;
     private final CacheOptimizer optimizer;
+    private final EnhancedCacheOptimizer enhancedOptimizer;
     
     public TranslationCache() {
         // 獲取 Minecraft 配置目錄
@@ -42,6 +43,7 @@ public class TranslationCache {
         }
         this.cacheFilePath = configDir.resolve(CACHE_FILE_NAME);
         this.optimizer = new CacheOptimizer(this);
+        this.enhancedOptimizer = new EnhancedCacheOptimizer(this);
         
         // 載入現有緩存
         loadCache();
@@ -83,6 +85,7 @@ public class TranslationCache {
             if (System.currentTimeMillis() - cached.getTimestamp() < thirtyDaysInMillis) {
                 LOGGER.debug("從緩存中找到翻譯: {} -> {}", originalText, cached.getTranslatedText());
                 optimizer.recordHit(key);
+                enhancedOptimizer.recordHit(key);
                 return cached.getTranslatedText();
             } else {
                 // 移除過期的緩存
@@ -92,6 +95,7 @@ public class TranslationCache {
         }
         
         optimizer.recordMiss(key);
+        enhancedOptimizer.recordMiss(key);
         return null;
     }
     
@@ -194,7 +198,36 @@ public class TranslationCache {
      */
     public void shutdown() {
         optimizer.shutdown();
+        enhancedOptimizer.shutdown();
         saveCache();
+    }
+    
+    /**
+     * 檢查緩存中是否包含指定鍵
+     */
+    public boolean containsKey(String key) {
+        return cache.containsKey(key);
+    }
+    
+    /**
+     * 從緩存中移除指定項目
+     */
+    public boolean removeFromCache(String key) {
+        return cache.remove(key) != null;
+    }
+    
+    /**
+     * 獲取增強版優化器統計信息
+     */
+    public EnhancedCacheOptimizer.CacheStats getEnhancedStats() {
+        return enhancedOptimizer.getStats();
+    }
+    
+    /**
+     * 獲取系統信息
+     */
+    public String getSystemInfo() {
+        return AdvancedCacheConfig.getSystemInfo();
     }
     
     /**

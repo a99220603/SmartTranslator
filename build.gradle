@@ -3,6 +3,7 @@ plugins {
     id 'maven-publish'
     id 'net.neoforged.moddev' version '2.0.107'
     id 'idea'
+    id 'org.owasp.dependencycheck' version '12.1.5'
 }
 
 tasks.named('wrapper', Wrapper).configure {
@@ -23,6 +24,39 @@ repositories {
 
 base {
     archivesName = mod_id
+}
+
+// Configure jar task to ensure it generates the JAR file
+jar {
+    archiveBaseName = mod_id
+    archiveVersion = mod_version
+    archiveClassifier = ''
+    
+    from sourceSets.main.output
+    
+    // Include resources with duplicate handling
+    from(sourceSets.main.resources) {
+        include '**/*'
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    }
+    
+    // Ensure the destination directory exists
+    destinationDirectory = file("$buildDir/libs")
+    
+    manifest {
+        attributes([
+            'Specification-Title': mod_name,
+            'Specification-Vendor': mod_authors,
+            'Specification-Version': '1',
+            'Implementation-Title': mod_name,
+            'Implementation-Version': mod_version,
+            'Implementation-Vendor': mod_authors,
+            'FMLModType': 'MOD'
+        ])
+    }
+    
+    // Force the task to always run
+    outputs.upToDateWhen { false }
 }
 
 // Mojang ships Java 21 to end users in 1.21.4, so mods should target Java 21.
@@ -124,6 +158,9 @@ dependencies {
     // Caffeine cache library for high-performance caching
     implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
     
+    // Gson for JSON processing
+    implementation 'com.google.code.gson:gson:2.10.1'
+    
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
     // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"
@@ -197,6 +234,60 @@ test {
 }
 
 // IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.
+// OWASP Dependency Check 配置
+dependencyCheck {
+    // 設置 NVD API 密鑰（建議從環境變量獲取）
+    nvd {
+        apiKey = System.getenv('NVD_API_KEY') ?: ''
+        delay = 16000 // 延遲16秒以避免速率限制
+    }
+    
+    // 配置報告格式
+    formats = ['HTML', 'JSON', 'XML']
+    
+    // 設置輸出目錄
+    outputDirectory = file("$buildDir/reports/dependency-check")
+    
+    // 配置掃描範圍
+    scanConfigurations = ['runtimeClasspath', 'compileClasspath']
+    
+    // 設置失敗閾值
+    failBuildOnCVSS = 7.0
+    
+    // 啟用實驗性分析器
+    analyzers {
+        experimentalEnabled = true
+        archiveEnabled = true
+        jarEnabled = true
+        centralEnabled = true
+        nexusEnabled = false
+        pyDistributionEnabled = false
+        pyPackageEnabled = false
+        rubygemsEnabled = false
+        opensslEnabled = false
+        cmakeEnabled = false
+        autoconfEnabled = false
+        composerEnabled = false
+        nodeEnabled = false
+        nuspecEnabled = false
+        assemblyEnabled = false
+        msbuildEnabled = false
+        nugetconfEnabled = false
+        cocoapodsEnabled = false
+        swiftEnabled = false
+        bundleAuditEnabled = false
+    }
+    
+    // 抑制已知的誤報
+    suppressionFile = file('dependency-check-suppressions.xml')
+    
+    // 跳過測試配置以加快速度
+    skipConfigurations = ['testCompileClasspath', 'testRuntimeClasspath']
+}
+
+// 移除自動運行依賴檢查，避免建構時卡住
+// check.dependsOn dependencyCheckAnalyze
+
 idea {
     module {
         downloadSources = true

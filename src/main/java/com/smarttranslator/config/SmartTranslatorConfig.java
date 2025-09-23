@@ -130,15 +130,15 @@ public class SmartTranslatorConfig {
         
         SHOW_ORIGINAL_TEXT = BUILDER
                 .comment("是否顯示原始文字")
-                .define("showOriginalText", false);
+                .define("showOriginalText", true);
         
         SHOW_TRANSLATION_STATUS = BUILDER
                 .comment("是否顯示翻譯狀態")
-                .define("showTranslationStatus", true);
+                .define("showTranslationStatus", false);
         
         TRANSLATION_PREFIX = BUILDER
                 .comment("翻譯文字前綴")
-                .define("translationPrefix", "[翻譯] ");
+                .define("translationPrefix", "§a[翻譯]§r ");
         
         BUILDER.pop();
     }
