@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.5] - 2025-09-23
+
+### Fixed
+- 修復 JSON 解析錯誤導致的模組載入失敗問題
+- 修復 ItemTranslationService 缺少 getCachedTranslation 方法的編譯錯誤
+- 重新生成損壞的翻譯緩存文件
+
+### Improved
+- 增強錯誤處理機制
+- 優化模組穩定性
+
 ## [2.3.4] - 2025-01-24
 
 ### Added

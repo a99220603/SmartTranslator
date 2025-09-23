@@ -78,8 +78,18 @@ public class ItemTranslationService {
         if (!shouldTranslateText(originalText, isItemName)) {
             return CompletableFuture.completedFuture(originalText);
         }
-        
+
         return translationManager.translateAsync(originalText);
+    }
+    
+    /**
+     * 獲取緩存的翻譯
+     */
+    public String getCachedTranslation(String originalText) {
+        if (translationManager == null) {
+            return null;
+        }
+        return translationManager.getCachedTranslation(originalText);
     }
     
     /**
@@ -167,19 +177,5 @@ public class ItemTranslationService {
         }
         
         return true;
-    }
-    
-    /**
-     * 獲取緩存的翻譯結果
-     */
-    public String getCachedTranslation(String originalText) {
-        return translationManager.getCachedTranslation(originalText);
-    }
-    
-    /**
-     * 檢查是否有緩存的翻譯
-     */
-    public boolean hasCachedTranslation(String originalText) {
-        return translationManager.hasCachedTranslation(originalText);
     }
 }
