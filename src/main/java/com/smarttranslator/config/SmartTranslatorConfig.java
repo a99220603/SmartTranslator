@@ -130,7 +130,7 @@ public class SmartTranslatorConfig {
         
         SHOW_ORIGINAL_TEXT = BUILDER
                 .comment("是否顯示原始文字")
-                .define("showOriginalText", true);
+                .define("showOriginalText", false);
         
         SHOW_TRANSLATION_STATUS = BUILDER
                 .comment("是否顯示翻譯狀態")

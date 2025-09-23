@@ -15,17 +15,24 @@ import org.lwjgl.glfw.GLFW;
  */
 public class KeyBindingHandler {
     
+    // 按鍵綁定定義
+    // \ 鍵：開啟/關閉整個翻譯功能
     public static final Lazy<KeyMapping> TOGGLE_TRANSLATION = Lazy.of(() -> 
             new KeyMapping("key.smarttranslator.toggle_translation", GLFW.GLFW_KEY_BACKSLASH, "key.categories.smarttranslator"));
     
+    // / 鍵：打開翻譯管理界面
     public static final Lazy<KeyMapping> OPEN_TRANSLATION_GUI = Lazy.of(() -> 
-            new KeyMapping("key.smarttranslator.open_gui", GLFW.GLFW_KEY_O, "key.categories.smarttranslator"));
+            new KeyMapping("key.smarttranslator.open_gui", GLFW.GLFW_KEY_SLASH, "key.categories.smarttranslator"));
+    
+    // R 鍵：按住顯示物品tooltip原文
+    public static final Lazy<KeyMapping> SHOW_ORIGINAL_TOOLTIP = Lazy.of(() -> 
+            new KeyMapping("key.smarttranslator.show_original", GLFW.GLFW_KEY_R, "key.categories.smarttranslator"));
     
     @SubscribeEvent
     public void onKeyInput(InputEvent.Key event) {
         Minecraft minecraft = Minecraft.getInstance();
         
-        // 反斜線鍵：切換翻譯功能開關
+        // T 鍵：切換翻譯功能開關
         if (minecraft.screen == null && TOGGLE_TRANSLATION.get().consumeClick()) {
             boolean currentState = SmartTranslatorConfig.ENABLED.get();
             SmartTranslatorConfig.ENABLED.set(!currentState);

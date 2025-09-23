@@ -68,6 +68,7 @@ public class SmartTranslator {
     private void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
         event.register(KeyBindingHandler.TOGGLE_TRANSLATION.get());
         event.register(KeyBindingHandler.OPEN_TRANSLATION_GUI.get());
+        event.register(KeyBindingHandler.SHOW_ORIGINAL_TOOLTIP.get());
     }
     
     public static SmartTranslator getInstance() {

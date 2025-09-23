@@ -2,12 +2,17 @@ package com.smarttranslator.events;
 
 import com.smarttranslator.SmartTranslator;
 import com.smarttranslator.config.SmartTranslatorConfig;
+import com.smarttranslator.translation.TranslationManager;
+import com.smarttranslator.events.KeyBindingHandler;
 import com.smarttranslator.translation.ItemTranslationService;
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.WrittenBookItem;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
 import org.slf4j.Logger;
@@ -41,6 +46,7 @@ public class ItemTooltipHandler {
     
     // 高性能緩存和狀態管理
     private final Map<String, String> fastCache = new ConcurrentHashMap<>();
+    private final Map<String, String> originalTextCache = new ConcurrentHashMap<>(); // 存儲原文
     private final Set<String> processingItems = ConcurrentHashMap.newKeySet();
     private final Map<String, Long> recentlyProcessed = new ConcurrentHashMap<>(); // 最近處理過的項目
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(THREAD_POOL_SIZE);
@@ -71,12 +77,107 @@ public class ItemTooltipHandler {
                 return;
             }
             
-            // 使用高性能非阻塞處理
-            processTooltipNonBlocking(tooltip, itemStack);
+            // 檢查是否為書本物品
+            boolean isBook = isBookItem(itemStack);
+            
+            // 如果是書本但書本翻譯功能被禁用，則跳過處理
+            if (isBook && !SmartTranslatorConfig.TRANSLATE_BOOKS.get()) {
+                return;
+            }
+            
+            // 檢查是否按住R鍵顯示原文
+            boolean showOriginalOnly = isShowOriginalKeyPressed();
+            
+            if (showOriginalOnly) {
+                // 顯示原文，恢復未翻譯狀態
+                processTooltipShowOriginal(tooltip);
+            } else {
+                // 根據物品類型選擇處理方式
+                if (isBook) {
+                    // 書本特殊處理
+                    processBookTooltip(tooltip, itemStack);
+                } else {
+                    // 正常翻譯處理
+                    processTooltipNonBlocking(tooltip, itemStack);
+                }
+            }
             
         } catch (Exception e) {
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("處理tooltip時發生錯誤", e);
+            }
+        }
+    }
+    
+    /**
+     * 檢查是否按住R鍵
+     */
+    private boolean isShowOriginalKeyPressed() {
+        try {
+            Minecraft minecraft = Minecraft.getInstance();
+            
+            // 確保在客戶端線程中執行
+            if (!minecraft.isSameThread()) {
+                return false;
+            }
+            
+            // 檢查按鍵狀態，無論是否在GUI界面中
+            return KeyBindingHandler.SHOW_ORIGINAL_TOOLTIP.get().isDown();
+            
+        } catch (Exception e) {
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("檢查R鍵狀態時發生錯誤", e);
+            }
+            return false;
+        }
+    }
+    
+    /**
+     * 處理顯示原文的tooltip
+     */
+    private void processTooltipShowOriginal(List<Component> tooltip) {
+        for (int i = 0; i < tooltip.size(); i++) {
+            Component component = tooltip.get(i);
+            String currentText = component.getString();
+            
+            // 嘗試從原文緩存中獲取原文
+            // 首先檢查當前文字是否就是翻譯文字（以翻譯文字為鍵查找原文）
+            String originalText = originalTextCache.get(currentText);
+            
+            // 如果沒找到，可能當前文字包含格式化內容，嘗試解析
+            if (originalText == null) {
+                // 檢查是否是雙語格式 "翻譯文字 [原文]" 或 "翻譯文字  [原文]"
+                if (currentText.contains(" [") && currentText.endsWith("]")) {
+                    int bracketStart = currentText.lastIndexOf(" [");
+                    if (bracketStart > 0) {
+                        String translatedPart = currentText.substring(0, bracketStart).trim();
+                        String originalPart = currentText.substring(bracketStart + 2, currentText.length() - 1);
+                        
+                        // 使用提取的原文
+                        originalText = originalPart;
+                        
+                        // 同時更新緩存
+                        originalTextCache.put(translatedPart, originalPart);
+                    }
+                } else {
+                    // 嘗試反向查找：遍歷緩存找到以當前文字為值的條目
+                    for (Map.Entry<String, String> entry : originalTextCache.entrySet()) {
+                        if (entry.getValue().equals(currentText)) {
+                            originalText = currentText; // 當前文字就是原文
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (originalText != null && !originalText.equals(currentText)) {
+                // 恢復原文，保持原有樣式
+                MutableComponent originalComponent = Component.literal(originalText);
+                Style originalStyle = component.getStyle();
+                if (originalStyle != null) {
+                    originalComponent = originalComponent.withStyle(originalStyle);
+                }
+                tooltip.set(i, originalComponent);
             }
         }
     }
@@ -232,6 +333,8 @@ public class ItemTooltipHandler {
                     if (translatedText != null && !translatedText.equals(originalText)) {
                         // 更新快速緩存
                         fastCache.put(originalText, translatedText);
+                        // 存儲原文到緩存，以翻譯文本為鍵，原文為值
+                        originalTextCache.put(translatedText, originalText);
                         
                         if (LOGGER.isDebugEnabled()) {
                             LOGGER.debug("翻譯完成並緩存: '{}' -> '{}'", originalText, translatedText);
@@ -257,21 +360,29 @@ public class ItemTooltipHandler {
      */
     private String getSimpleTranslation(String originalText) {
         // 暫時使用簡單的映射來測試功能
+        String translation = null;
         switch (originalText.toLowerCase()) {
             case "oak log":
-                return "橡木原木";
+                translation = "橡木原木";
+                break;
             case "stone":
-                return "石頭";
+                translation = "石頭";
+                break;
             case "dirt":
-                return "泥土";
+                translation = "泥土";
+                break;
             case "grass block":
-                return "草方塊";
+                translation = "草方塊";
+                break;
             case "cobblestone":
-                return "鵝卵石";
+                translation = "鵝卵石";
+                break;
             case "wooden planks":
-                return "木板";
+                translation = "木板";
+                break;
             case "oak planks":
-                return "橡木木板";
+                translation = "橡木木板";
+                break;
             default:
                 // 如果沒有預設翻譯，嘗試使用翻譯服務
                 try {
@@ -283,6 +394,13 @@ public class ItemTooltipHandler {
                     return originalText;
                 }
         }
+        
+        // 如果有翻譯結果，存儲到原文緩存
+        if (translation != null && !translation.equals(originalText)) {
+            originalTextCache.put(translation, originalText);
+        }
+        
+        return translation;
     }
     
     /**
@@ -512,9 +630,125 @@ public class ItemTooltipHandler {
     }
     
     /**
-     * 定期清理過期緩存和狀態
-     * 防止內存洩漏
+     * 檢查物品是否為書本類型
      */
+    private boolean isBookItem(ItemStack itemStack) {
+        if (itemStack == null || itemStack.isEmpty()) {
+            return false;
+        }
+        
+        // 檢查是否為書本或寫過的書本
+        return itemStack.getItem() instanceof WrittenBookItem ||
+               itemStack.is(Items.BOOK) ||
+               itemStack.is(Items.WRITABLE_BOOK) ||
+               itemStack.is(Items.WRITTEN_BOOK);
+    }
+    
+    /**
+     * 處理書本tooltip的特殊邏輯
+     */
+    private void processBookTooltip(List<Component> tooltip, ItemStack itemStack) {
+        try {
+            // 對於書本，我們需要特別處理內容翻譯
+            for (int i = 0; i < tooltip.size(); i++) {
+                Component component = tooltip.get(i);
+                String text = component.getString();
+                
+                // 跳過空文本或過短的文本
+                if (text == null || text.trim().isEmpty() || text.length() < 2) {
+                    continue;
+                }
+                
+                // 檢查是否已經翻譯過（包含[翻譯]標記）
+                if (text.contains("[翻譯]")) {
+                    continue;
+                }
+                
+                // 檢查快速緩存
+                String cacheKey = "book_" + text.hashCode();
+                String cachedTranslation = fastCache.get(cacheKey);
+                
+                if (cachedTranslation != null) {
+                    // 使用緩存的翻譯
+                    MutableComponent translatedComponent = createBilingualComponent(text, cachedTranslation, component);
+                    tooltip.set(i, translatedComponent);
+                } else {
+                    // 異步翻譯書本內容
+                    scheduleBookTranslation(tooltip, i, component, text, cacheKey);
+                }
+            }
+        } catch (Exception e) {
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("處理書本tooltip時發生錯誤", e);
+            }
+        }
+    }
+    
+    /**
+     * 調度書本內容的異步翻譯
+     */
+    private void scheduleBookTranslation(List<Component> tooltip, int index, Component component, String text, String cacheKey) {
+        // 檢查是否已在處理中
+        if (processingItems.contains(cacheKey)) {
+            return;
+        }
+        
+        processingItems.add(cacheKey);
+        
+        scheduler.execute(() -> {
+            try {
+                // 執行翻譯
+                String translatedText = performBookTranslation(text);
+                
+                if (translatedText != null && !translatedText.equals(text)) {
+                    // 更新緩存
+                    fastCache.put(cacheKey, translatedText);
+                    originalTextCache.put(cacheKey, text);
+                    
+                    // 在主線程中更新tooltip
+                    Minecraft.getInstance().execute(() -> {
+                        try {
+                            if (index < tooltip.size()) {
+                                MutableComponent translatedComponent = createBilingualComponent(text, translatedText, component);
+                                tooltip.set(index, translatedComponent);
+                            }
+                        } catch (Exception e) {
+                            if (LOGGER.isDebugEnabled()) {
+                                LOGGER.debug("更新書本tooltip時發生錯誤", e);
+                            }
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug("翻譯書本內容時發生錯誤", e);
+                }
+            } finally {
+                processingItems.remove(cacheKey);
+            }
+        });
+    }
+    
+    /**
+     * 執行書本內容的翻譯
+     */
+    private String performBookTranslation(String text) {
+        try {
+            // 使用TranslationManager進行翻譯
+            TranslationManager translationManager = SmartTranslator.getInstance().getTranslationManager();
+            if (translationManager != null) {
+                return translationManager.translate(text);
+            }
+            
+            // 如果TranslationManager不可用，使用簡單翻譯邏輯
+            return getSimpleTranslation(text);
+        } catch (Exception e) {
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("執行書本翻譯時發生錯誤", e);
+            }
+            return null;
+        }
+    }
     private void cleanupExpiredData() {
         try {
             long currentTime = System.currentTimeMillis();
