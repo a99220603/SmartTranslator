@@ -1,7 +1,7 @@
 
 # Smart Translator MOD 🌐
 
-[![Version](https://img.shields.io/badge/version-2.3.4-blue.svg)](https://github.com/a99220603/SmartTranslator)
+[![Version](https://img.shields.io/badge/version-2.3.5-blue.svg)](https://github.com/a99220603/SmartTranslator)
 [![Minecraft](https://img.shields.io/badge/minecraft-1.21.4-green.svg)](https://minecraft.net/)
 [![NeoForge](https://img.shields.io/badge/neoforge-21.4.154-orange.svg)](https://neoforged.net/)
 
@@ -36,7 +36,7 @@
 - NeoForge 21.4.154 或更高版本
 
 ### 安裝步驟
-1. 下載最新版本的 `smarttranslator-2.3.4.jar`
+1. 下載最新版本的 `smarttranslator-2.3.5.jar`
 2. 將 JAR 文件放入 Minecraft 的 `mods` 資料夾
 3. 啟動遊戲即可使用
 
