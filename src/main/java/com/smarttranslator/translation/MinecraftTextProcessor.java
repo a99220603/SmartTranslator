@@ -172,14 +172,23 @@ public class MinecraftTextProcessor {
             // 處理 Unicode 轉義序列
             processedText = processUnicodeEscapes(processedText);
             
+            // 改進的文本清理：移除多餘的空白字符
+            processedText = cleanupWhitespace(processedText);
+            
             // 保存格式化代碼的位置
             Map<Integer, String> formattingCodes = extractFormattingCodes(processedText);
             
             // 移除格式化代碼以便翻譯
             processedText = removeFormattingCodes(processedText);
             
+            // 處理特殊字符和符號
+            processedText = normalizeSpecialCharacters(processedText);
+            
             // 根據處理模式替換 Wynncraft 特殊符號
             processedText = replaceWynncraftSymbols(processedText);
+            
+            // 最終清理：移除前後空白
+            processedText = processedText.trim();
             
             return processedText;
             
@@ -196,44 +205,39 @@ public class MinecraftTextProcessor {
         if (translatedText == null || translatedText.isEmpty()) {
             return translatedText;
         }
-        
+
         // 如果原文為null，直接返回翻譯文本
         if (originalText == null) {
             return translatedText;
         }
-        
+
         try {
+            // 改進的文本清理
+            String cleanedTranslation = cleanupTranslationArtifacts(translatedText);
+            
             // 如果翻譯結果與原文相同，直接返回原文（保持格式）
             String cleanOriginal = removeFormattingCodes(originalText);
-            String cleanTranslated = removeFormattingCodes(translatedText);
-            
+            String cleanTranslated = removeFormattingCodes(cleanedTranslation);
+
             if (cleanOriginal.equals(cleanTranslated)) {
                 return originalText;
             }
-            
+
             // 檢查是否需要顏色保留處理
             if (ColorPreservingTranslator.needsColorPreservation(originalText)) {
-                String processedText = ColorPreservingTranslator.translateWithColorPreservation(originalText, translatedText);
-                
-                // 如果翻譯結果沒有顏色代碼，但原文有，則添加主要顏色
-                if (!processedText.contains("§") && originalText.contains("§")) {
-                    String mainColor = extractMainColor(originalText);
-                    if (mainColor != null) {
-                        processedText = mainColor + processedText;
-                    }
-                }
-                
-                // 確保格式重置
-                if (!processedText.endsWith("§r") && originalText.contains("§")) {
-                    processedText += "§r";
-                }
-                
+                String processedText = ColorPreservingTranslator.translateWithColorPreservation(originalText, cleanedTranslation);
+
+                // 改進的格式恢復邏輯
+                processedText = improveFormattingRestoration(processedText, originalText);
+
                 return processedText;
             }
-            
-            return translatedText;
-            
+
+            // 對於沒有格式的文本，進行基本的後處理
+            return applyBasicPostProcessing(cleanedTranslation, originalText);
+
         } catch (Exception e) {
+            System.err.println("後處理翻譯失敗: " + translatedText + ", 錯誤: " + e.getMessage());
             // 降級到基本格式恢復
             return restoreBasicFormatting(translatedText, originalText);
         }
@@ -343,6 +347,138 @@ public class MinecraftTextProcessor {
                     result = result.replace(entry.getKey(), entry.getValue());
                 }
                 break;
+        }
+        
+        return result;
+    }
+    
+    /**
+     * 清理多餘的空白字符
+     */
+    private static String cleanupWhitespace(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        
+        // 將多個連續空白字符替換為單個空格
+        return text.replaceAll("\\s+", " ");
+    }
+    
+    /**
+     * 標準化特殊字符
+     */
+    private static String normalizeSpecialCharacters(String text) {
+        if (text == null || text.isEmpty()) {
+            return text;
+        }
+        
+        String result = text;
+        
+        // 標準化引號
+        result = result.replace("\u201C", "\"").replace("\u201D", "\"");
+        result = result.replace("\u2018", "'").replace("\u2019", "'");
+        
+        // 標準化破折號
+        result = result.replace("\u2014", "-").replace("\u2013", "-");
+        
+        // 標準化省略號
+        result = result.replace("\u2026", "...");
+        
+        // 移除零寬字符
+        result = result.replace("\u200B", "").replace("\u200C", "").replace("\u200D", "");
+        
+        return result;
+    }
+    
+    /**
+     * 清理翻譯結果中的人工痕跡
+     */
+    private static String cleanupTranslationArtifacts(String translatedText) {
+        if (translatedText == null || translatedText.isEmpty()) {
+            return translatedText;
+        }
+        
+        String result = translatedText;
+        
+        // 移除常見的翻譯API添加的標記
+        result = result.replaceAll("^\\[翻譯\\]\\s*", "");
+        result = result.replaceAll("^\\[Translation\\]\\s*", "");
+        result = result.replaceAll("^翻譯：\\s*", "");
+        result = result.replaceAll("^Translation:\\s*", "");
+        
+        // 移除多餘的引號
+        if (result.startsWith("\"") && result.endsWith("\"") && result.length() > 2) {
+            result = result.substring(1, result.length() - 1);
+        }
+        
+        // 清理多餘的空白
+        result = cleanupWhitespace(result);
+        
+        return result.trim();
+    }
+    
+    /**
+     * 改進的格式恢復邏輯
+     */
+    private static String improveFormattingRestoration(String processedText, String originalText) {
+        if (processedText == null || originalText == null) {
+            return processedText;
+        }
+        
+        String result = processedText;
+        
+        // 如果翻譯結果沒有顏色代碼，但原文有，則添加主要顏色
+        if (!result.contains("§") && originalText.contains("§")) {
+            String mainColor = extractMainColor(originalText);
+            if (mainColor != null) {
+                result = mainColor + result;
+            }
+        }
+        
+        // 確保格式重置
+        if (!result.endsWith("§r") && originalText.contains("§")) {
+            result += "§r";
+        }
+        
+        // 檢查並修復格式代碼的連續性
+        result = fixFormattingContinuity(result);
+        
+        return result;
+    }
+    
+    /**
+     * 修復格式代碼的連續性
+     */
+    private static String fixFormattingContinuity(String text) {
+        if (text == null || !text.contains("§")) {
+            return text;
+        }
+        
+        // 移除重複的格式代碼
+        String result = text.replaceAll("(§[0-9a-fk-or])\\1+", "$1");
+        
+        // 移除無效的格式代碼組合
+        result = result.replaceAll("§r§r+", "§r");
+        
+        return result;
+    }
+    
+    /**
+     * 應用基本的後處理
+     */
+    private static String applyBasicPostProcessing(String translatedText, String originalText) {
+        if (translatedText == null) {
+            return originalText;
+        }
+        
+        String result = translatedText;
+        
+        // 如果原文有格式但翻譯結果沒有，嘗試添加基本格式
+        if (originalText.contains("§") && !result.contains("§")) {
+            String mainColor = extractMainColor(originalText);
+            if (mainColor != null) {
+                result = mainColor + result + "§r";
+            }
         }
         
         return result;

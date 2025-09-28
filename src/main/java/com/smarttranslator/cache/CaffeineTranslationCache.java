@@ -58,6 +58,14 @@ public class CaffeineTranslationCache extends TranslationCache {
         CachedTranslation cachedTranslation = cache.getIfPresent(key);
         
         if (cachedTranslation != null) {
+            // 檢查緩存是否過期
+            if (isCacheExpired(cachedTranslation)) {
+                cache.invalidate(key);
+                optimizer.recordMiss(key);
+                LOGGER.debug("緩存已過期並移除: {}", key);
+                return null;
+            }
+            
             optimizer.recordHit(key);
             LOGGER.debug("緩存命中: {}", key);
             return cachedTranslation.getTranslatedText();
@@ -66,6 +74,21 @@ public class CaffeineTranslationCache extends TranslationCache {
             LOGGER.debug("緩存未命中: {}", key);
             return null;
         }
+    }
+    
+    /**
+     * 檢查緩存項是否過期
+     */
+    private boolean isCacheExpired(CachedTranslation cached) {
+        if (cached == null) {
+            return true;
+        }
+        
+        long currentTime = System.currentTimeMillis();
+        long cacheTime = cached.getTimestamp();
+        long maxAge = 24 * 60 * 60 * 1000; // 24小時，單位毫秒
+        
+        return (currentTime - cacheTime) > maxAge;
     }
     
     /**
