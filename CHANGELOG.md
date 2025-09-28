@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.6] - 2025-01-25
+
+### Fixed
+- 修復翻譯錯誤 - 改進文本預處理和後處理邏輯
+- 修復編譯錯誤 - 解決字符串轉義和配置引用問題
+- 修復測試失敗 - 更新測試用例以匹配改進的文本處理邏輯
+
+### Improved
+- 優化緩存性能 - 添加緩存過期檢查和清理機制
+- 改進文本預處理：添加空白字符清理和特殊字符標準化
+- 改進文本後處理：增強格式代碼恢復和翻譯痕跡清理
+- 提升翻譯準確性和格式保持能力
+
 ## [2.3.5] - 2025-09-23
 
 ### Fixed

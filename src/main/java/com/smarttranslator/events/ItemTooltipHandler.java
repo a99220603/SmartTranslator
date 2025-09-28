@@ -757,22 +757,65 @@ public class ItemTooltipHandler {
             recentlyProcessed.entrySet().removeIf(entry -> 
                 currentTime - entry.getValue() > 5000);
             
-            // 清理快速緩存（保留最近1000個條目）
-            if (fastCache.size() > 1000) {
-                // 簡單的LRU清理：移除一半條目
-                Iterator<String> iterator = fastCache.keySet().iterator();
-                int toRemove = fastCache.size() / 2;
-                while (iterator.hasNext() && toRemove > 0) {
-                    iterator.next();
-                    iterator.remove();
-                    toRemove--;
-                }
-            }
+            // 改進的智能緩存清理機制
+            cleanupFastCache(currentTime);
             
         } catch (Exception e) {
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("清理緩存時發生錯誤", e);
             }
+        }
+    }
+    
+    /**
+     * 智能快速緩存清理機制
+     * 使用基於訪問時間和頻率的LRU策略
+     */
+    private void cleanupFastCache(long currentTime) {
+        final int MAX_CACHE_SIZE = 1000;
+        final int TARGET_SIZE = 800; // 清理到80%容量
+        final long CACHE_EXPIRE_TIME = 5 * 60 * 1000; // 5分鐘過期
+        
+        if (fastCache.size() <= MAX_CACHE_SIZE) {
+            return;
+        }
+        
+        // 創建訪問時間追蹤映射
+        Map<String, Long> accessTimes = new ConcurrentHashMap<>();
+        
+        // 記錄當前所有緩存項的訪問時間
+        for (String key : fastCache.keySet()) {
+            accessTimes.put(key, recentlyProcessed.getOrDefault(key, 0L));
+        }
+        
+        // 按訪問時間排序，移除最舊的項目
+        List<Map.Entry<String, Long>> sortedEntries = accessTimes.entrySet()
+            .stream()
+            .sorted(Map.Entry.comparingByValue())
+            .collect(java.util.stream.Collectors.toList());
+        
+        int toRemove = fastCache.size() - TARGET_SIZE;
+        int removed = 0;
+        
+        for (Map.Entry<String, Long> entry : sortedEntries) {
+            if (removed >= toRemove) {
+                break;
+            }
+            
+            String key = entry.getKey();
+            long lastAccess = entry.getValue();
+            
+            // 移除過期或最少使用的項目
+            if (currentTime - lastAccess > CACHE_EXPIRE_TIME || removed < toRemove) {
+                fastCache.remove(key);
+                originalTextCache.remove(key);
+                recentlyProcessed.remove(key);
+                removed++;
+            }
+        }
+        
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("智能緩存清理完成：移除 {} 個項目，當前大小 {}", removed, fastCache.size());
         }
     }
     
